@@ -1,0 +1,893 @@
+*&---------------------------------------------------------------------*
+*& Report  Z_CODE_LIGHTER
+*&
+*&---------------------------------------------------------------------*
+*& by George Shlyahov @ SCN.sap.com
+*& http_://scn.sap.com/people/george.shlyahov
+*&---------------------------------------------------------------------*
+
+REPORT z_code_lighter.
+
+CONSTANTS:
+  gc_begin         TYPE text1024 VALUE `<BODY_BEGIN>`,
+  gc_end           TYPE text1024 VALUE `</BODY_END>`,
+  gc_blue          TYPE text1024 VALUE `<SPAN_BLUE>`,
+  gc_grey          TYPE text1024 VALUE `<SPAN_GREY>`,
+  gc_green         TYPE text1024 VALUE `<SPAN_GREEN>`,
+  gc_light_blue    TYPE text1024 VALUE `<SPAN_LIGHT_BLUE>`,
+  gc_brown         TYPE text1024 VALUE `<SPAN_BROWN>`,
+  gc_violet        TYPE text1024 VALUE `<SPAN_VIOLET>`,
+  gc_span_close    TYPE text1024 VALUE `</SPAN_CLOSE>`,
+  gc_italic        TYPE text1024 VALUE `<ITALIC>`,
+  gc_italic_close  TYPE text1024 VALUE `</ITALIC_CLOSE>`,
+  gc_dummy         TYPE text1024 VALUE `<DUMMY>`,
+
+  gc_begin0        TYPE text1024 VALUE `<PRE class='jive_text_macro jive_macro_quote' jivemacro='quote' _modifiedtitle='true'>`,
+  gc_end0          TYPE text1024 VALUE `</PRE>`,
+  gc_blue0         TYPE text1024 VALUE `<SPAN style='color: #0000ff;'>`,
+  gc_grey0         TYPE text1024 VALUE `<SPAN style='color: #808080;'>`,
+  gc_green0        TYPE text1024 VALUE `<SPAN style='color: #4DA616;'>`,
+  gc_light_blue0   TYPE text1024 VALUE `<SPAN style='color: #3399FF;'>`,
+  gc_brown0        TYPE text1024 VALUE `<SPAN style='color: #800097;'>`,
+  gc_violet0       TYPE text1024 VALUE `<SPAN style='color: #800080;'>`,
+  gc_span_close0   TYPE text1024 VALUE `</SPAN>`,
+  gc_italic0       TYPE text1024 VALUE `<EM>`,
+  gc_italic_close0 TYPE text1024 VALUE `</EM>`.
+
+TYPE-POOLS abap.
+
+TYPES:
+  BEGIN OF ty_keyword,
+    word TYPE text50,
+  END OF ty_keyword.
+
+DATA:
+  go_dock TYPE REF TO cl_gui_docking_container,
+  go_container_1 TYPE REF TO cl_gui_container,
+  go_editor_1    TYPE REF TO cl_gui_textedit,
+  go_container_2 TYPE REF TO cl_gui_container,
+  go_editor_2    TYPE REF TO cl_gui_textedit,
+  gt_code        TYPE STANDARD TABLE OF text1024,
+  gt_keywords    TYPE STANDARD TABLE OF ty_keyword,
+  g_suppress     TYPE abap_bool.
+
+
+REFRESH gt_keywords.
+PERFORM words.
+
+SELECTION-SCREEN BEGIN OF SCREEN 2000.
+SELECTION-SCREEN END OF SCREEN 2000.
+
+START-OF-SELECTION.
+  CALL SELECTION-SCREEN 2000.
+
+AT SELECTION-SCREEN.
+  REFRESH gt_code.
+  CALL METHOD go_editor_1->get_text_as_r3table
+    IMPORTING
+      table = gt_code.
+
+  PERFORM color.
+
+  FIELD-SYMBOLS <s_code> LIKE LINE OF gt_code.
+  LOOP AT gt_code ASSIGNING <s_code>.
+    CONCATENATE `<P style='font-family:courier;color:black'>` <s_code> '</P>' INTO <s_code>.
+  ENDLOOP.
+
+  DATA: gt_code_tmp LIKE gt_code.
+  gt_code_tmp = gt_code.
+  REFRESH gt_code.
+
+  APPEND gc_begin TO gt_code.
+  APPEND LINES OF gt_code_tmp TO gt_code.
+  APPEND gc_end TO gt_code.
+
+  LOOP AT gt_code ASSIGNING <s_code>.
+    REPLACE ALL OCCURRENCES OF gc_begin        IN <s_code> WITH gc_begin0.
+    REPLACE ALL OCCURRENCES OF gc_end          IN <s_code> WITH gc_end0.
+    REPLACE ALL OCCURRENCES OF gc_blue         IN <s_code> WITH gc_blue0.
+    REPLACE ALL OCCURRENCES OF gc_grey         IN <s_code> WITH gc_grey0.
+    REPLACE ALL OCCURRENCES OF gc_green        IN <s_code> WITH gc_green0.
+    REPLACE ALL OCCURRENCES OF gc_light_blue   IN <s_code> WITH gc_light_blue0.
+    REPLACE ALL OCCURRENCES OF gc_brown        IN <s_code> WITH gc_brown0.
+    REPLACE ALL OCCURRENCES OF gc_violet       IN <s_code> WITH gc_violet0.
+    REPLACE ALL OCCURRENCES OF gc_span_close   IN <s_code> WITH gc_span_close0.
+    REPLACE ALL OCCURRENCES OF gc_italic       IN <s_code> WITH gc_italic0.
+    REPLACE ALL OCCURRENCES OF gc_italic_close IN <s_code> WITH gc_italic_close0.
+  ENDLOOP.
+
+  CALL METHOD go_editor_2->set_text_as_r3table
+    EXPORTING
+      table           = gt_code
+    EXCEPTIONS
+      error_dp        = 1
+      error_dp_create = 2
+      OTHERS          = 3.
+
+  CALL SELECTION-SCREEN 2000.
+
+AT SELECTION-SCREEN OUTPUT.
+  CHECK go_dock IS NOT BOUND.
+  CREATE OBJECT go_dock
+    EXPORTING
+      parent = cl_gui_container=>screen0
+      side   = cl_gui_docking_container=>dock_at_left
+      ratio  = 90.
+
+  DATA go_splitter TYPE REF TO cl_gui_splitter_container.
+
+  CREATE OBJECT go_splitter
+    EXPORTING
+      parent  = go_dock
+      rows    = 1
+      columns = 2.
+
+  CHECK go_container_1 IS NOT BOUND.
+  CALL METHOD go_splitter->get_container
+    EXPORTING
+      row       = 1
+      column    = 1
+    RECEIVING
+      container = go_container_1.
+
+  CHECK go_editor_1 IS NOT BOUND.
+
+  CREATE OBJECT go_editor_1
+    EXPORTING
+      parent                     = go_container_1
+      wordwrap_mode              = cl_gui_textedit=>wordwrap_at_fixed_position
+      wordwrap_position          = 1024
+      wordwrap_to_linebreak_mode = cl_gui_textedit=>true.
+
+  CHECK go_container_2 IS NOT BOUND.
+  CALL METHOD go_splitter->get_container
+    EXPORTING
+      row       = 1
+      column    = 2
+    RECEIVING
+      container = go_container_2.
+
+  CHECK go_container_2 IS BOUND.
+  CHECK go_editor_2 IS NOT BOUND.
+
+  CREATE OBJECT go_editor_2
+    EXPORTING
+      parent                     = go_container_2
+      wordwrap_mode              = cl_gui_textedit=>wordwrap_at_fixed_position
+      wordwrap_position          = 1024
+      wordwrap_to_linebreak_mode = cl_gui_textedit=>true.
+
+  IF go_editor_2 IS BOUND.
+    CALL METHOD go_editor_2->set_readonly_mode.
+  ENDIF.
+
+
+*&---------------------------------------------------------------------*
+*&      Form  color
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM color.
+
+  DATA:
+    l_gt  TYPE text100,
+    l_lt  TYPE text100,
+    l_gt2 TYPE text100,
+    l_lt2 TYPE text100.
+
+  FIELD-SYMBOLS <s_code> LIKE LINE OF gt_code.
+
+
+  LOOP AT gt_code ASSIGNING <s_code>.
+
+    CONCATENATE '&g' 't;' INTO l_gt.
+    CONCATENATE '&l' 't;' INTO l_lt.
+
+    REPLACE ALL OCCURRENCES OF '>' IN <s_code> WITH l_gt.
+    REPLACE ALL OCCURRENCES OF '<' IN <s_code> WITH l_lt.
+
+    CONCATENATE gc_brown l_gt gc_span_close INTO l_gt2.
+    CONCATENATE gc_brown l_lt gc_span_close INTO l_lt2.
+
+    REPLACE ALL OCCURRENCES OF l_gt IN <s_code> WITH l_gt2.
+    REPLACE ALL OCCURRENCES OF l_lt IN <s_code> WITH l_lt2.
+
+    IF <s_code>(1) = '*'.
+*     Comments with asterisk:
+      PERFORM color_comments USING '\*.*' gc_grey gc_span_close
+                          CHANGING <s_code>.
+    ELSE.
+*     Key words:
+      PERFORM color_key_words USING '[a-zA-Z_-]+\w' gc_blue gc_span_close
+                           CHANGING <s_code>.
+
+*     Digits in brackets:
+      DATA: l_open  TYPE text1024,
+            l_close TYPE text1024.
+      CONCATENATE '(' gc_light_blue INTO l_open.
+      CONCATENATE gc_span_close ')' INTO l_close.
+      PERFORM color_text USING '\((\d+)\)' "regex
+                               l_open      "open tag
+                               l_close     "close tag
+                      CHANGING <s_code>.
+
+      CONCATENATE gc_brown '(' gc_span_close INTO l_gt.
+      CONCATENATE gc_brown ')' gc_span_close INTO l_lt.
+      REPLACE ALL OCCURRENCES OF '(' IN <s_code> WITH l_gt.
+      REPLACE ALL OCCURRENCES OF ')' IN <s_code> WITH l_lt.
+
+*     Detached digits (TODO):
+      PERFORM color_text USING '\d\d*' "regex
+                                gc_light_blue           "open tag
+                                gc_span_close           "close tag
+                       CHANGING <s_code>.
+
+      CONCATENATE gc_violet ',' gc_span_close INTO l_gt.
+      CONCATENATE gc_violet '.' gc_span_close INTO l_lt.
+      REPLACE ALL OCCURRENCES OF ',' IN <s_code> WITH l_gt.
+      REPLACE ALL OCCURRENCES OF '.' IN <s_code> WITH l_lt.
+
+      CONCATENATE gc_violet `=>` gc_span_close INTO l_gt.
+      REPLACE ALL OCCURRENCES OF `=>` IN <s_code> WITH l_gt.
+
+      CONCATENATE gc_violet `->` gc_span_close INTO l_gt.
+      REPLACE ALL OCCURRENCES OF `->` IN <s_code> WITH l_gt.
+
+      CONCATENATE gc_violet `&nb` `sp;` `=` `&nb` `sp;` gc_span_close INTO l_gt.
+      REPLACE ALL OCCURRENCES OF ` = ` IN <s_code> WITH l_gt.
+
+*     Comments with quotation marks:
+      PERFORM color_comments USING '".*' gc_grey gc_span_close
+                          CHANGING <s_code>.
+
+*     Text in inverted commas:
+      PERFORM color_text USING `([\'][^\']*[\'])` gc_green gc_span_close
+                      CHANGING <s_code>.
+
+*     Texs in SQL-like inverted commas:
+      PERFORM color_text USING '([\`][^\`]*[\`])' gc_green gc_span_close
+                      CHANGING <s_code>.
+
+    ENDIF.
+  ENDLOOP.
+
+ENDFORM.                    "color
+
+
+*&---------------------------------------------------------------------*
+*&      Form  color_key_words
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->U_REGEX      text
+*      -->U_OPEN_TAG   text
+*      -->U_CLOSE_TAG  text
+*      -->CS_CODE      text
+*----------------------------------------------------------------------*
+FORM color_key_words USING u_regex     TYPE text1024
+                           u_open_tag  TYPE text1024
+                           u_close_tag TYPE text1024
+                  CHANGING cs_code     TYPE any.
+
+  DATA:
+    lt_code    LIKE gt_code,
+    lo_matcher TYPE REF TO cl_abap_matcher,
+    lf_success TYPE abap_bool VALUE abap_true,
+    ls_match   TYPE match_result,
+    l_keyword  TYPE text1024,
+    l_offset   TYPE i,
+    l_newtext  TYPE text1024.
+
+  FIELD-SYMBOLS:
+    <s_line>  LIKE LINE OF lo_matcher->table,
+    <s_code>  LIKE LINE OF gt_code,
+    <keyword> LIKE LINE OF gt_keywords.
+
+
+  APPEND cs_code TO lt_code.
+  lo_matcher = cl_abap_matcher=>create( pattern     = u_regex
+                                        ignore_case = abap_true
+                                        table       = lt_code ).
+  CHECK lo_matcher IS BOUND.
+  WHILE lf_success = abap_true.
+    lf_success = lo_matcher->find_next( ).
+    CHECK lf_success = abap_true.
+    ls_match = lo_matcher->get_match( ).
+    CHECK ls_match IS NOT INITIAL.
+    READ TABLE lo_matcher->table ASSIGNING <s_line> INDEX ls_match-line.
+    CHECK sy-subrc = 0.
+    READ TABLE gt_code ASSIGNING <s_code> INDEX ls_match-line.
+    CHECK sy-subrc = 0.
+    CHECK <s_line>(1) NE '*'.
+    l_keyword = <s_line>+ls_match-offset(ls_match-length).
+    TRANSLATE l_keyword TO UPPER CASE.
+    IF g_suppress = abap_true.
+      g_suppress = abap_false.
+      CONTINUE.
+    ENDIF.
+    READ TABLE gt_keywords ASSIGNING <keyword> WITH KEY word = l_keyword.
+    CHECK sy-subrc = 0.
+    IF <keyword> = 'FORM'.
+      g_suppress = abap_true.
+    ENDIF.
+    l_offset = ls_match-offset - 1.
+    IF l_offset GE 0 AND l_offset LT STRLEN( <s_line> ).
+      CHECK <s_line>+l_offset(1) = ` `.
+    ENDIF.
+    CONCATENATE u_open_tag <s_line>+ls_match-offset(ls_match-length) u_close_tag INTO l_newtext.
+    lf_success = lo_matcher->replace_found( l_newtext ).
+  ENDWHILE.
+
+  lt_code = lo_matcher->table.
+  READ TABLE lt_code INTO cs_code INDEX 1.
+
+ENDFORM.                    "color_key_words
+
+
+*&---------------------------------------------------------------------*
+*&      Form  color_comments
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->U_REGEX      text
+*      -->U_OPEN_TAG   text
+*      -->U_CLOSE_TAG  text
+*      -->CS_CODE      text
+*----------------------------------------------------------------------*
+FORM color_comments USING u_regex     TYPE text1024
+                          u_open_tag  TYPE text1024
+                          u_close_tag TYPE text1024
+                 CHANGING cs_code     TYPE text1024.
+
+  DATA:
+    l_open_tag  TYPE text1024,
+    l_close_tag TYPE text1024.
+
+  CONCATENATE gc_italic u_open_tag        INTO l_open_tag.
+  CONCATENATE u_close_tag gc_italic_close INTO l_close_tag.
+
+  PERFORM color_text USING u_regex
+                           l_open_tag
+                           l_close_tag
+                  CHANGING cs_code.
+
+ENDFORM.                    "color_comments
+
+
+*&---------------------------------------------------------------------*
+*&      Form  color_text
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->U_REGEX      text
+*      -->U_OPEN_TAG   text
+*      -->U_CLOSE_TAG  text
+*      -->CS_CODE      text
+*----------------------------------------------------------------------*
+FORM color_text USING u_regex     TYPE text1024
+                      u_open_tag  TYPE text1024
+                      u_close_tag TYPE text1024
+             CHANGING cs_code     TYPE text1024.
+
+  TYPES:
+    BEGIN OF ty_res,
+      text TYPE text1024,
+    END OF ty_res.
+
+  DATA:
+    ls_match            TYPE match_result,
+    ls_match2           TYPE match_result,
+    ls_res              TYPE ty_res,
+    lt_res              TYPE STANDARD TABLE OF ty_res,
+    l_offset            TYPE i,
+    l_length            TYPE i,
+    l_newtext           TYPE text1024,
+    lf_change           TYPE flag,
+    l_grey_italic       TYPE text1024,
+    l_grey_italic_close TYPE text1024.
+
+
+  CONCATENATE gc_italic gc_grey             INTO l_grey_italic.
+  CONCATENATE gc_span_close gc_italic_close INTO l_grey_italic_close.
+
+  DO 999 TIMES.
+    lf_change = abap_true.
+    CLEAR ls_match.
+    FIND FIRST OCCURRENCE OF REGEX u_regex IN cs_code MATCH OFFSET ls_match-offset
+                                                      MATCH LENGTH ls_match-length.
+    IF ls_match-length > 0.
+      IF u_regex = '\((\d+)\)'. "Remove brackets from digits in brackets
+        SUBTRACT 2 FROM ls_match-length.
+        ADD 1 TO ls_match-offset.
+      ELSEIF u_regex = '\d\d*'.
+
+        l_offset = ls_match-offset - 1.
+        IF cs_code+l_offset(1) = ` `
+        OR cs_code+l_offset(1) = space
+        OR cs_code+l_offset(1) IS INITIAL.
+          lf_change = abap_true.
+          l_offset = ls_match-offset + ls_match-length.
+          IF l_offset GE 0 AND l_offset LT STRLEN( cs_code ).
+            IF cs_code+l_offset(1) = ` `
+            OR cs_code+l_offset(1) = space
+            OR cs_code+l_offset(1) IS INITIAL
+            OR cs_code+l_offset(1) = '.'.
+              lf_change = abap_true.
+            ELSE.
+              lf_change = abap_false.
+            ENDIF.
+          ENDIF.
+        ELSE.
+          lf_change = abap_false.
+        ENDIF.
+      ENDIF.
+
+      ls_res-text = cs_code+ls_match-offset(ls_match-length).
+
+*     If there is the begin of a comment in brackets:
+      FIND FIRST OCCURRENCE OF l_grey_italic IN ls_res-text MATCH OFFSET ls_match2-offset
+                                                            MATCH LENGTH ls_match2-length.
+      IF ls_match2-length > 0. "It is not actually a comment, because it is in inverted commas
+        REPLACE FIRST OCCURRENCE OF l_grey_italic IN ls_res-text WITH ''. "Delete an opening tag
+        IF ls_match2-offset > 0 AND ls_match2-offset < STRLEN( cs_code ).
+          REPLACE FIRST OCCURRENCE OF l_grey_italic_close IN cs_code+ls_match2-offset WITH ''. "Delete a closing tag
+        ENDIF.
+      ENDIF.
+
+      REPLACE ALL OCCURRENCES OF REGEX '[\<][^\>]+[\>]' IN ls_res-text WITH ''. "Clear text content from HTML-tags
+      APPEND ls_res TO lt_res.
+
+      IF lf_change = abap_false.
+        l_newtext = gc_dummy.
+      ELSE.
+        CONCATENATE u_open_tag gc_dummy u_close_tag INTO l_newtext.
+      ENDIF.
+      REPLACE FIRST OCCURRENCE OF REGEX u_regex IN cs_code WITH l_newtext.
+    ELSE.
+      EXIT.
+    ENDIF.
+  ENDDO.
+
+  LOOP AT lt_res INTO ls_res.
+    REPLACE FIRST OCCURRENCE OF gc_dummy IN cs_code WITH ls_res-text.
+  ENDLOOP.
+
+ENDFORM.                    "color_text
+
+
+DEFINE add_word.
+  append &1 to gt_keywords.
+END-OF-DEFINITION.
+
+
+*&---------------------------------------------------------------------*
+*&      Form  words
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM words.
+
+  add_word 'ABS'.
+  add_word 'ACOS'.
+  add_word 'ADD'.
+  add_word 'ADD-CORRESPONDING'.
+  add_word 'ADJACENT'.
+  add_word 'AFTER'.
+  add_word 'ALIASES'.
+  add_word 'ALL'.
+  add_word 'ANALYZER'.
+  add_word 'AND'.
+  add_word 'ANY'.
+  add_word 'APPEND'.
+  add_word 'AS'.
+  add_word 'ASCENDING'.
+  add_word 'ASIN'.
+  add_word 'ASSIGN'.
+  add_word 'ASSIGNED'.
+  add_word 'ASSIGNING'.
+  add_word 'AT'.
+  add_word 'ATAN'.
+  add_word 'AUTHORITY-CHECK'.
+  add_word 'AVG'.
+  add_word 'BACK'.
+  add_word 'BOUND'.
+  add_word 'BEFORE'.
+  add_word 'BEGIN'.
+  add_word 'BINARY'.
+  add_word 'BIT'.
+  add_word 'BIT-AND'.
+  add_word 'BIT-NOT'.
+  add_word 'BIT-OR'.
+  add_word 'BIT-XOR'.
+  add_word 'BLANK'.
+  add_word 'BLOCK'.
+  add_word 'BREAK'.
+  add_word 'BREAK-POINT'.
+  add_word 'BUFFER'.
+  add_word 'BY'.
+  add_word 'C'.
+  add_word 'CALL'.
+  add_word 'CASE'.
+  add_word 'CATCH'.
+  add_word 'CEIL'.
+  add_word 'CENTERED'.
+  add_word 'CHAIN'.
+  add_word 'CHANGE'.
+  add_word 'CHANGING'.
+  add_word 'CHECK'.
+  add_word 'CHECKBOX'.
+  add_word 'CLASS'.
+  add_word 'CLASS-DATA'.
+  add_word 'CLASS-EVENTS'.
+  add_word 'CLASS-METHODS'.
+  add_word 'CLASS-POOL'.
+  add_word 'CLEAR'.
+  add_word 'CLIENT'.
+  add_word 'CLOSE'.
+  add_word 'CNT'.
+  add_word 'CODE'.
+  add_word 'COLLECT'.
+  add_word 'COMMENT'.
+  add_word 'COMMIT'.
+  add_word 'COMMUNICATION'.
+  add_word 'COMPUTE'.
+  add_word 'CONCATENATE'.
+  add_word 'CONDENSE'.
+  add_word 'CONSTANTS'.
+  add_word 'CONTEXT'.
+  add_word 'CONTEXTS'.
+  add_word 'CONTINUE'.
+  add_word 'CONTROL'.
+  add_word 'CONTROLS'.
+  add_word 'CONVERT'.
+  add_word 'COPY'.
+  add_word 'CORRESPONDING'.
+  add_word 'COS'.
+  add_word 'COSH'.
+  add_word 'COUNT'.
+  add_word 'COUNTRY'.
+  add_word 'CREATE'.
+  add_word 'CURRENCY'.
+  add_word 'CURSOR'.
+  add_word 'CUSTOMER-FUNCTION'.
+  add_word 'DATA'.
+  add_word 'DATABASE'.
+  add_word 'DATASET'.
+  add_word 'DEFINITION'.
+  add_word 'DEFERRED'.
+  add_word 'DELETE'.
+  add_word 'DECIMALS'.
+  add_word 'DEFAULT'.
+  add_word 'DEFINE'.
+  add_word 'DELETE'.
+  add_word 'DEMAND'.
+  add_word 'DESCENDING'.
+  add_word 'DESCRIBE'.
+  add_word 'DIALOG'.
+  add_word 'DISPLAY'.
+  add_word 'DISTINCT'.
+  add_word 'DIV'.
+  add_word 'DIVIDE'.
+  add_word 'DIVIDE-CORRESPONDING'.
+  add_word 'DO'.
+  add_word 'DUPLICATES'.
+  add_word 'DYNPRO'.
+  add_word 'EDIT'.
+  add_word 'EDITOR-CALL'.
+  add_word 'ELSE'.
+  add_word 'ELSEIF'.
+  add_word 'END-OF-DEFINITION'.
+  add_word 'END-OF-PAGE'.
+  add_word 'END-OF-SELECTION'.
+  add_word 'END'.
+  add_word 'ENDAT'.
+  add_word 'ENDCASE'.
+  add_word 'ENDCATCH'.
+  add_word 'ENDCHAIN'.
+  add_word 'ENDCLASS'.
+  add_word 'ENDDO'.
+  add_word 'ENDEXEC'.
+  add_word 'ENDFORM'.
+  add_word 'ENDFUNCTION'.
+  add_word 'ENDIF'.
+  add_word 'ENDINTERFACE'.
+  add_word 'ENDLOOP'.
+  add_word 'ENDMETHOD'.
+  add_word 'ENDMODULE'.
+  add_word 'ENDON'.
+  add_word 'ENDPROVIDE'.
+  add_word 'ENDSELECT'.
+  add_word 'ENDWHILE'.
+  add_word 'ENTRIES'.
+  add_word 'EVENT'.
+  add_word 'EVENTS'.
+  add_word 'EXEC'.
+  add_word 'EXIT'.
+  add_word 'EXIT-COMMAND'.
+  add_word 'EXP'.
+  add_word 'EXPONENT'.
+  add_word 'EXPORT'.
+  add_word 'EXPORTING'.
+  add_word 'EXCEPTIONS'.
+  add_word 'EXTENDED'.
+  add_word 'EXTRACT'.
+  add_word 'FETCH'.
+  add_word 'FIELD'.
+  add_word 'FIELD-GROUPS'.
+  add_word 'FIELD-SYMBOLS'.
+  add_word 'FIELDS'.
+  add_word 'FINAL'.
+  add_word 'FLOOR'.
+  add_word 'FOR'.
+  add_word 'FORM'.
+  add_word 'FORMAT'.
+  add_word 'FRAC'.
+  add_word 'FRAME'.
+  add_word 'FREE'.
+  add_word 'FROM'.
+  add_word 'FUNCTION'.
+  add_word 'FUNCTION-POOL'.
+  add_word 'GENERATE'.
+  add_word 'GET'.
+  add_word 'GROUP'.
+  add_word 'HANDLER'.
+  add_word 'HASHED'.
+  add_word 'HEADER'.
+  add_word 'HELP-ID'.
+  add_word 'HELP-REQUEST'.
+  add_word 'HIDE'.
+  add_word 'HOTSPOT'.
+  add_word 'ICON'.
+  add_word 'ID'.
+  add_word 'IF'.
+  add_word 'IMPORT'.
+  add_word 'IMPORTING'.
+  add_word 'IN'.
+  add_word 'INCLUDE'.
+  add_word 'INDEX'.
+  add_word 'INFOTYPES'.
+  add_word 'INITIAL'.
+  add_word 'INITIALIZATION'.
+  add_word 'INNER'.
+  add_word 'INPUT'.
+  add_word 'INSERT'.
+  add_word 'INTENSIFIED'.
+  add_word 'INTERFACE'.
+  add_word 'INTERFACE-POOL'.
+  add_word 'INTERFACES'.
+  add_word 'INTO'.
+  add_word 'INVERSE'.
+  add_word 'IS'.
+  add_word 'JOIN'.
+  add_word 'KEY'.
+  add_word 'LANGUAGE'.
+  add_word 'LAST'.
+  add_word 'LEAVE'.
+  add_word 'LEFT'.
+  add_word 'LEFT-JUSTIFIED'.
+  add_word 'LIKE'.
+  add_word 'LINAL'.
+  add_word 'LINE'.
+  add_word 'LINE-COUNT'.
+  add_word 'LINE-SELECTION'.
+  add_word 'LINE-SIZE'.
+  add_word 'LINES'.
+  add_word 'LIST-PROCESSING'.
+  add_word 'LOAD'.
+  add_word 'LOAD-OF-PROGRAM'.
+  add_word 'LOCAL'.
+  add_word 'LOCALE'.
+  add_word 'LOG'.
+  add_word 'LOG10'.
+  add_word 'LOOP'.
+  add_word 'M'.
+  add_word 'MARGIN'.
+  add_word 'MASK'.
+  add_word 'MATCHCODE'.
+  add_word 'MAX'.
+  add_word 'MEMORY'.
+  add_word 'MESSAGE'.
+  add_word 'MESSAGE-ID'.
+  add_word 'MESSAGES'.
+  add_word 'METHOD'.
+  add_word 'METHODS'.
+  add_word 'MIN'.
+  add_word 'MOD'.
+  add_word 'MODE'.
+  add_word 'MODIF'.
+  add_word 'MODIFY'.
+  add_word 'MODULE'.
+  add_word 'MOVE'.
+  add_word 'MOVE-CORRESPONDING'.
+  add_word 'MULTIPLY'.
+  add_word 'MULTIPLY-CORRESPONDING'.
+  add_word 'NEW'.
+  add_word 'NEW-LINE'.
+  add_word 'NEW-PAGE'.
+  add_word 'NEXT'.
+  add_word 'NO'.
+  add_word 'NE'.
+  add_word 'NOT'.
+  add_word 'NO-GAP'.
+  add_word 'NO-GAPS'.
+  add_word 'NO-HEADING'.
+  add_word 'NO-SCROLLING'.
+  add_word 'NO-SIGN'.
+  add_word 'NO-TITLE'.
+  add_word 'NO-ZERO'.
+  add_word 'NODES'.
+  add_word 'NON-UNIQUE'.
+  add_word 'O'.
+  add_word 'OBJECT'.
+  add_word 'OBLIGATORY'.
+  add_word 'OCCURS'.
+  add_word 'OCCURRENCES'.
+  add_word 'OF'.
+  add_word 'OFF'.
+  add_word 'ON'.
+  add_word 'OPEN'.
+  add_word 'OR'.
+  add_word 'ORDER'.
+  add_word 'OTHERS'.
+  add_word 'OUTER'.
+  add_word 'OUTPUT'.
+  add_word 'OVERLAY'.
+  add_word 'PACK'.
+  add_word 'PAGE'.
+  add_word 'PARAMETER'.
+  add_word 'PARAMETERS'.
+  add_word 'PERFORM'.
+  add_word 'PF-STATUS'.
+  add_word 'POSITION'.
+  add_word 'PRINT'.
+  add_word 'PRINT-CONTROL'.
+  add_word 'PRIVATE'.
+  add_word 'PROCESS'.
+  add_word 'PROGRAM'.
+  add_word 'PROPERTY'.
+  add_word 'PROTECTED'.
+  add_word 'PROVIDE'.
+  add_word 'PUBLIC'.
+  add_word 'PUT'.
+  add_word 'RADIOBUTTON'.
+  add_word 'RAISE'.
+  add_word 'RAISING'.
+  add_word 'RANGE'.
+  add_word 'RANGES'.
+  add_word 'READ'.
+  add_word 'RECEIVE'.
+  add_word 'REF'.
+  add_word 'REFRESH'.
+  add_word 'REJECT'.
+  add_word 'REPLACE'.
+  add_word 'REPORT'.
+  add_word 'REQUESTED'.
+  add_word 'RESERVE'.
+  add_word 'RESET'.
+  add_word 'RIGHT-JUSTIFIED'.
+  add_word 'ROLLBACK'.
+  add_word 'ROUND'.
+  add_word 'ROWS'.
+  add_word 'RTTI'.
+  add_word 'RUN'.
+  add_word 'SCAN'.
+  add_word 'SCAN'.
+  add_word 'SCREEN'.
+  add_word 'SEARCH'.
+  add_word 'SECTION'.
+  add_word 'SEPARATED'.
+  add_word 'SCROLL'.
+  add_word 'SCROLL-BOUNDARY'.
+  add_word 'SEARCH'.
+  add_word 'SELECT'.
+  add_word 'SELECT-OPTIONS'.
+  add_word 'SELECTION-SCREEN'.
+  add_word 'SELECTION-TABLE'.
+  add_word 'SET'.
+  add_word 'SHARED'.
+  add_word 'SHIFT'.
+  add_word 'SIGN'.
+  add_word 'SIN'.
+  add_word 'SINGLE'.
+  add_word 'SINH'.
+  add_word 'SIZE'.
+  add_word 'SKIP'.
+  add_word 'SORT'.
+  add_word 'SORTED'.
+  add_word 'SPLIT'.
+  add_word 'SQL'.
+  add_word 'SQRT'.
+  add_word 'STAMP'.
+  add_word 'STANDARD'.
+  add_word 'START-OF-SELECTION'.
+  add_word 'STATICS'.
+  add_word 'STOP'.
+  add_word 'STRUCTURE'.
+  add_word 'SUBMIT'.
+  add_word 'SUBTRACT'.
+  add_word 'SUBTRACT-CORRESPONDING'.
+  add_word 'SUM'.
+  add_word 'SUPPLY'.
+  add_word 'SUPPRESS'.
+  add_word 'SYMBOL'.
+  add_word 'SYNTAX-CHECK'.
+  add_word 'SYNTAX-TRACE'.
+  add_word 'SYSTEM-CALL'.
+  add_word 'SYSTEM-EXCEPTIONS'.
+  add_word 'TABLE'.
+  add_word 'TABLE_LINE'.
+  add_word 'TABLES'.
+  add_word 'TAN'.
+  add_word 'TANH'.
+  add_word 'TEXT'.
+  add_word 'TEXTPOOL'.
+  add_word 'TIME'.
+  add_word 'TIMES'.
+  add_word 'TITLE'.
+  add_word 'TITLEBAR'.
+  add_word 'TO'.
+  add_word 'TOP-OF-PAGE'.
+  add_word 'TRANSACTION'.
+  add_word 'TRANSFER'.
+  add_word 'TRANSLATE'.
+  add_word 'TRANSPORTING'.
+  add_word 'TRUNC'.
+  add_word 'TYPE'.
+  add_word 'TYPE-POOL'.
+  add_word 'TYPE-POOLS'.
+  add_word 'TYPES'.
+  add_word 'ULINE'.
+  add_word 'UNDER'.
+  add_word 'UNIQUE'.
+  add_word 'UNIT'.
+  add_word 'UNPACK'.
+  add_word 'UP'.
+  add_word 'UPDATE'.
+  add_word 'USER-COMMAND'.
+  add_word 'USING'.
+  add_word 'UPPER'.
+  add_word 'VALUE'.
+  add_word 'VALUE-REQUEST'.
+  add_word 'VALUES'.
+  add_word 'VARY'.
+  add_word 'WHEN'.
+  add_word 'WHERE'.
+  add_word 'WHILE'.
+  add_word 'WINDOW'.
+  add_word 'WITH'.
+  add_word 'WITH-TITLE'.
+  add_word 'WORK'.
+  add_word 'WRITE'.
+  add_word 'X'.
+  add_word 'XSTRING'.
+  add_word 'Z'.
+  add_word 'ZONE'.
+*----------------------------*
+  add_word 'TRY'.
+  add_word 'ENDTRY'.
+  add_word 'RECEIVING'.
+  add_word 'REGEX'.
+  add_word 'EQ'.
+  add_word 'NE'.
+  add_word 'LT'.
+  add_word 'GT'.
+  add_word 'LE'.
+  add_word 'GE'.
+  add_word 'CO'.
+  add_word 'CN'.
+  add_word 'CA'.
+  add_word 'NA'.
+  add_word 'CS'.
+  add_word 'NS'.
+  add_word 'CP'.
+  add_word 'NP'.
+  add_word 'FIND'.
+  add_word 'FIRST'.
+  add_word 'OCCURRENCE'.
+  add_word 'MATCH'.
+  add_word 'OFFSET'.
+  add_word 'LENGTH'.
+  add_word 'DELETING'.
+  add_word 'LEADING'.
+
+ENDFORM.                    "words
